@@ -94,7 +94,7 @@ dataset$ScreenResolution
 # we can see, this column, contain a lot of information. 
 sum(duplicated(dataset$ScreenResolution))
 duplicated(dataset$ScreenResolution) # lots of duplicate value
-unique(dataset$ScreenResolution)
+unique(dataset$ScreenResolution) # only unique value (what are those value?)
 
 # table(dataset$ScreenResolution) # - count values
 
@@ -103,4 +103,144 @@ unique(dataset$ScreenResolution)
 # and the X-axis and Y-axis screen resolution.
 
 #1. We will extract touch screen information
+
+# Fetching touchscreen data from Screen resolution column
+dataset$touchscreen <- ifelse(grepl("Touchscreen", dataset$ScreenResolution), 1, 0)
+# It is a binary variable so we can encode it as 0 and 1. 
+# 1 means the laptop is a touch screen and 0 indicates not a touch screen.
+
+head(dataset) # we separated touchscreen data
+
+#Number of Touchscreen laptop - have / not have
+barplot(table(dataset$touchscreen), main='Number of TouchScreen laptop',ylab = "No. of occurance",xlab = "TouchScreen", col='blue', breaks=12)
+# non-touch screen laptop are most in dataset 
+
+# Relationship between Touchscreen and Price
+ggplot(dataset, aes(x = factor(touchscreen), y = Price, fill = Price, colour = Price)) + 
+  geom_bar(stat = "identity", position = "dodge")
+# By observing, touchscreen laptop price is high.
+
+# 2. Fetching IPS panel 
+dataset$Ips <- ifelse(grepl("IPS", dataset$ScreenResolution), 1, 0)
+
+head(dataset)
+
+barplot(table(dataset$Ips), main='Number of IPS Panel laptop',ylab = "Number",xlab = "IPS Panel", col='blue', breaks=12)
+# Laptop with IPS Panel are less in our dataset.
+
+
+# Relationship between IPS and Price
+ggplot(dataset, aes(x = factor(Ips), y = Price, fill = Price, colour = 'red')) + 
+  geom_bar(stat = "identity", position = "dodge")
+
+# We can see, without IPS Panel laptop are expensive than with IPS panel.
+#So, with IPS Panel doesn't mean Price will be high.
+
+#3. Fetching X-axis and Y-axis screen resolution
+
+res <- strsplit(dataset$ScreenResolution, "x", fixed = TRUE)
+res # seperated by x (cross symbol) eg: "1920x1080" to "1920" "1080"
+
+dataset$X_res <- sapply(res, function(x) x[1])
+dataset$Y_res <- sapply(res, function(x) x[2])
+head(dataset)
+
+dataset$X_res <- gsub(",", "", dataset$X_res)
+dataset$X_res <- as.numeric(regmatches(dataset$X_res, regexpr("\\d+\\.?\\d+", dataset$X_res)))
+glimpse(dataset) 
+# X and Y res are char dtype so need to convert into numeric dtype
+dataset$Y_res <- as.numeric(dataset$Y_res)
+glimpse(dataset)
+
+# Let see, what the correlation of all columns with Price 
+
+column_to_compare <- dataset$Price
+correlations <- sapply(dataset[sapply(dataset, is.numeric)], function(x) cor(x, column_to_compare))
+correlations
+
+# we can see that inches do not have a strong correlation, but X and Y-axis resolution do,
+# so we can take advantage of this and convert these three columns to a single column 
+# known as Pixel per inches (PPI). 
+
+# Replacing inches, X and Y resolution to PPI
+dataset$ppi <- (((dataset$X_res^2) + (dataset$Y_res^2))^0.5) / as.numeric(dataset$Inches)
+
+head(dataset)           
+
+# Drop the extra columns which are not helpful our price prediction
+# X','X_res', 'Y_res', 'Inches', 'ScreenResolution'
+dataset <- dataset[, !(names(dataset) %in% c('X','X_res', 'Y_res', 'Inches', 'ScreenResolution'))]
+glimpse(dataset)
+
+
+# Now, CPU column, does it affect Price?
+unique(dataset$Cpu)
+# Cpu have 117 different categories, which give information about pre-processor and 
+# speed of laptops.
+
+# Extract the pre-processor - i3,i5, i7, i6,AMD,....
+
+# extract the first three words from the Cpu name
+dataset$CpuName <- sapply(dataset$Cpu, function(x) {
+  words <- unlist(strsplit(x, " "))
+  if (length(words) >= 3) {
+    paste0(words[1:3], collapse = " ")
+  } else {
+    paste0(words, collapse = " ")  # Use all available words if less than 3
+  }
+})
+
+
+fetch_processor <- function(text) {
+  if (text == 'Intel Core i7' || text == 'Intel Core i5' || text == 'Intel Core i3') {
+    return(text)
+  } else {
+    if (strsplit(text, " ")[[1]][1] == 'Intel') {
+      return('Other Intel Processor')
+    } else {
+      return('AMD Processor')
+    }
+  }
+}
+dataset$Cpu_brand <- sapply(dataset$CpuName, fetch_processor)
+head(dataset)
+
+
+barplot(table(dataset$Cpu_brand), main='Number of CPU brand',ylab = "Count",xlab = "CPU brand", col='blue', breaks=12)
+# Intel i7 and i5 are the most in the dataset.
+
+# Will price vary based on cpu processor?
+
+# Relationship between Cpu brand and Price
+ggplot(dataset, aes(x = factor(Cpu_brand), y = Price, fill = Price, colour = Price)) + 
+  geom_bar(stat = "identity", position = "dodge")
+# As, Intel Core i7 have high price than i5,i3,AMD processor.
+# Also, the AMD and i5 have almost same range of Price.
+# So, we can say, Price will vary according to Cpu processor.
+
+# Drop Cpu and Cpu Name column
+dataset <- dataset[, !(names(dataset) %in% c('Cpu', 'CpuName'))]
+glimpse(dataset)
+
+# What about RAM vs Price?
+
+barplot(table(dataset$Ram), main='Number of RAMs',ylab = "Count",xlab = "RAM", col='blue', breaks=12)
+# Laptop with 8 GB rams are the most in the dataset. 
+
+# Relationship between Price and RAM
+ggplot(dataset, aes(x = factor(Ram), y = Price, fill = Price, colour = Price)) + 
+  geom_bar(stat = "identity", position = "dodge")
+# here, we can see 64 GB RAM price less than 32 GB RAM.
+# So, size of high RAM doesn't mean high price.
+
+# Memory vs Price?
+
+dataset$Memory # lots of information 
+unique(dataset$Memory) # what are the unique one - 39 chan
+
+# Feature Engineering
+
+
+
+
 
