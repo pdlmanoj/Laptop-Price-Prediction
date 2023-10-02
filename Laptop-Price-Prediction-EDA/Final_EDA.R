@@ -1,38 +1,33 @@
 
-# import all required packages
-
+## REQUIRED PACKAGES
+## IMPORT
 library(tidyverse)
 library(GGally)
 library(ggplot2)
-library(randomForest)
 library(caret)
 library(dplyr)
 library(corrplot)
 library(caTools)
 library(caret)
-library(e1071)
+library(e1071) # Support Vector Regression (SVR)
 library(rpart)
-library(randomForest)
+library(randomForest) # Random Forest
 library(MASS)
-library(xgboost)
-install.packages("car")
-library(car)
-
+library(car) # vif - Variance Inflation Factor
 
 # load laptop-prediction dataset
 
 dataset <- read.csv("Laptop-Price-Prediction-EDA/laptop_data.csv")
 head(dataset)
 
-# view(dataset)
+#view(dataset)
 
+summary(data)
 
 dim(dataset) # total 1302 rows and 12 columns
 
 
-glimpse(dataset) 
-
-# summary(dataset)
+glimpse(dataset)
 
 # check if there any duplicate data present or not.
 duplicated(dataset) 
@@ -40,13 +35,17 @@ duplicated(dataset)
 # Any Null value?
 anyNA(dataset) # No null value present.
 
+# Whole Dataset each column by column unique value
+d = sapply(colnames(dataset), function(col) unique(dataset[[col]]))
+print(d)
+
 # =============================
-  ## Data Cleaning
+## Data Cleaning
 # =============================
 
 # Changing the RAM and Weight dtype to numeric dtype
 
-head(dataset)
+glimpse(dataset)
 
 # replace All occurance of "GB" and "kg" to "".
 dataset$Ram <- gsub(pattern = "GB", replacement = "", x = dataset$Ram)
@@ -61,7 +60,6 @@ dataset$Weight <- as.double(dataset$Weight)
 
 
 glimpse(dataset)
-
 
 # =============================
 ## Data visualization / EDA
@@ -100,10 +98,10 @@ ggplot(dataset, aes(x = factor(Inches), y = Price, fill = Price, colour = Price)
 # but not a strong relationship between the price and size column.
 # We can say, Size doesn't matter for laptop price.
 
+
 # =============================
 ## Feature Engineering
 # =============================
-
 
 # Does Screen Resolution affect Price of Laptop?
 dataset$ScreenResolution
@@ -169,11 +167,6 @@ glimpse(dataset)
 dataset$Y_res <- as.numeric(dataset$Y_res)
 glimpse(dataset)
 
-# Let see, what the correlation of all columns with Price 
-
-column_to_compare <- dataset$Price
-correlations <- sapply(dataset[sapply(dataset, is.numeric)], function(x) cor(x, column_to_compare))
-correlations
 
 # we can see that inches do not have a strong correlation, but X and Y-axis resolution do,
 # so we can take advantage of this and convert these three columns to a single column 
@@ -310,10 +303,9 @@ dataset$Flash_Storage <- (dataset$first * dataset$Layer1Flash_Storage) + (datase
 
 dataset <- dataset[, !(names(dataset) %in% c("first", "second", "Layer1hdd", "Layer1ssd", "Layer2hdd", "Layer2ssd", "Layer1Flash_Storage", "Layer2Flash_Storage", "Layer1Hybrid", "Layer2Hybrid"))]
 
-cor(dataset[,unlist(lapply(dataset, is.numeric))])
 # If we see correlation of Price with Hybrid and Flash_Stroage doesn't have less correlation.
 # So, we drop this two column
-dataset <- dataset[, !(names(dataset) %in% c("Hybrid", "Flash_Storage"))]
+
 dataset <- dataset[, !(names(dataset) == "Memory"), drop = FALSE]
 head(dataset)
 
@@ -339,7 +331,6 @@ ggplot(dataset, aes(x = factor(Gpubrand), y = Price, fill = Price, colour = Pric
 # Drop GPU column
 dataset <- dataset[, !(names(dataset) %in% c('Gpu'))]
 head(dataset)
-
 
 # Operating System
 
@@ -367,7 +358,7 @@ head(dataset)
 barplot(table(dataset$OS), main='count of Operating System',ylab = "Count",xlab = "OS", col='blue', breaks=12)
 # Intel GPU are most in dataset.
 
-# Relationship between GPU and Price
+# Relationship between OS and Price
 ggplot(dataset, aes(x = factor(OS), y = Price, fill = Price, colour = Price)) + 
   geom_bar(stat = "identity", position = "dodge")
 # windows laptop are more expansive compare to other's
@@ -390,9 +381,10 @@ ggplot(data= dataset, aes(x= Company, y= Price, fill= Company))+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
-# ========================================
-# Correlation Matrix for our data set
-# ========================================
+head(dataset)
+
+
+
 glimpse(dataset)
 
 # Only numeric column - cor()
@@ -408,6 +400,7 @@ highlyCorrelated <- findCorrelation(corMat, cutoff = 0.7) #find highly correlate
 highlyCorCol <- colnames(numericData)[highlyCorrelated]
 highlyCorCol # SSD is as we can see.
 
+head(dataset)
 
 
 # What's About our Price Density
@@ -419,8 +412,8 @@ ggplot(dataset, aes(x = Price)) +
   labs(title = "Price Distribution", x = "Price", y = "Count") +
   theme_minimal()
 # As we can see, our targeted column Price is right skewed 
-# By transforming it to normal distribution performance of the algorithm 
-# will increase. we take the log of values
+# By transforming it to normal. Performance of the algorithm 
+# will increase.
 
 ggplot(dataset, aes(x = log(Price))) +
   geom_freqpoly(binwidth = 0.2, size = .8, color = "red") +
@@ -429,37 +422,33 @@ ggplot(dataset, aes(x = log(Price))) +
   ylab("Frequency / Count") +
   ggtitle("Distribution of Logarithm of Price")
 
-dataset$Price = log(dataset$Price) # log value Price to Price column
-head(dataset$Price)
+head(dataset)
 
+#### Using log transformation in price column
+dataset$Price = log(dataset$Price)
+dataset
 
-head(dataset) # As we can see there are many categorial data like
-# company, typeName, Gpubrand, Os
-
+# Encoding cateogrical column to numeric
 # Specify the categorical columns
-categorial_columns <- c("Company", "TypeName", "OS", "Cpu_brand", "Gpubrand")
-
-categorial_columns
+catcols <- c("ScreenResolution", "Company", "TypeName", "OS_category", "Cpu_brand", "Gpu_brand")
 
 # Encode categorical variables as integers using label encoding
-
-for (col in categorial_columns) {
+for (col in catcols) {
   dataset[[col]] <- as.integer(factor(dataset[[col]]))
 }
 
-head(dataset) # sucessfully change categorial to numeric
+dataset
 
-cor_matrix <- cor(dataset)
-# Create a heatmap of the correlation matrix
-corrplot(cor_matrix, method = "color", type = "full", tl.cex = 0.8)
 
+
+#### Compute the variance inflation factors (VIF)
 
 vif_values <- vif(lm(Price ~ ., data = dataset))
 
 # Print the VIF values
 print(vif_values)
 
-##### Removing outliers using robust regression
+# Building Model
 library(MASS)
 model = rlm(Price ~ ., data = dataset)
 residuals = residuals(model)
@@ -473,44 +462,68 @@ outliers = which(abs(residuals) > threshold)
 data_no_outliers = dataset %>%
   filter(!row_number() %in% outliers)
 
-# ----------------------------
-# ----------------------------
-# TRAINING AND TESTING DATA
-# ----------------------------
-# ----------------------------
+
+# Creating testing and training set
 
 set.seed(123)
-split = sample.split(data_no_outliers$Price, SplitRatio = .80)
+split = sample.split(data_no_outliers$Price, SplitRatio = .85)
 
 training_set = subset(data_no_outliers, split== TRUE)
 test_set = subset(data_no_outliers, split == FALSE)
 y_test = test_set$Price
 
-# --------------------------
-### LINEAR REGRESSION
-# ------------------------------
 
-reg_1 = lm(formula = Price~.-Weight -TypeName,
+head(training_set)
+head(test_set)
+head(y_test)
+
+# 1. Linear Regression
+
+reg_1 = lm(formula = Price~.-Hybrid -Weight -TypeName,
            data = training_set)
 
 summary(reg_1)
 
 #printing adjusted R-squared
 
-summary(reg_1)$adj.r.squared
+summary(reg_1)$adj.r.squared # 75 % accurary
 
 
 y_pred = predict(reg_1, newdata= test_set)
 
-y_pred
+# Comparing Traning Price Prediction with Real Price
+comparison = data.frame(predicted= exp(y_pred), True= exp(y_test))
+print(comparison)
 
-y_pred <- predict(model, newdata=test_set)
 
-comparison <- data.frame(predicted=exp(y_pred), True=exp(y_test))
-comparison
-# --------------------------
-### RANDOM FOREST
-# ---------------------------
+#2. Support Vector Regression (SVR)
+reg_2 = svm(formula= Price~.,
+            data= training_set,
+            type= 'eps-regression',
+            kernel= 'radial',
+            sigma= 0.1,
+            C = 1)
+#Prediction 
+
+y_pred = predict(reg_2, newdata= test_set)
+
+# Calculate R-squared score
+r2_score = R2(y_test, y_pred)
+
+# Calculate mean absolute error
+mae = MAE(y_test, y_pred)
+
+# Print R-squared score and mean absolute error
+print(paste("R2 score:", r2_score)) # 87% accurarcy
+print(paste("MAE:", mae))
+
+# Comparing Traning Price Prediction with Real Price
+comparison = data.frame(predicted= exp(y_pred), True= exp(y_test))
+print(comparison)
+
+## Bettter Result than Linear Regression
+
+##. Random Forest
 
 set.seed(1234)
 reg_4 = randomForest(
@@ -522,17 +535,25 @@ reg_4 = randomForest(
 )
 
 #prediction
+
 y_pred = predict(reg_4, newdata = test_set)
 
 #calculate R2 score
+
 r2_score = R2(y_pred, y_test)
 
 #calculate MAE score
+
 mae = MAE(y_pred, y_test)
 
 #print R2 and mae score
-print(paste("R2 score:", r2_score))
+
+print(paste("R2 score:", r2_score)) # 89 % accuracy
 print(paste("MAE Score:", mae))
 
+# Comparing Training Price Prediction with Real Price
 comparison = data.frame(predicted= exp(y_pred), True= exp(y_test))
 print(comparison)
+
+
+
