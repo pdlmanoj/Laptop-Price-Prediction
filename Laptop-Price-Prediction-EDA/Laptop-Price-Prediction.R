@@ -4,11 +4,12 @@
 library(tidyverse)
 library(GGally)
 library(ggplot2)
-
+library(randomForest)
+library(caret)
 
 # load laptop-prediction dataset
 
-dataset = read.csv("Laptop-Price-Prediction-EDA/laptop_data.csv")
+dataset <- read.csv("Laptop-Price-Prediction-EDA/laptop_data.csv")
 head(dataset)
 
 # view(dataset)
@@ -18,6 +19,8 @@ dim(dataset) # total 1302 rows and 12 columns
 
 
 glimpse(dataset) 
+
+# summary(dataset)
 
 # check if there any duplicate data present or not.
 duplicated(dataset) 
@@ -42,7 +45,8 @@ head(dataset)
 # Changing the RAM and Weight dtype to numeric dtype
 
 dataset$Ram <- as.integer(dataset$Ram)
-dataset$Weight <- as.integer(dataset$Weight)
+dataset$Weight <- as.double(dataset$Weight)
+
 
 glimpse(dataset)
 
@@ -239,6 +243,7 @@ ggplot(dataset, aes(x = factor(Ram), y = Price, fill = Price, colour = Price)) +
 
 # Memory vs Price?
 
+head(dataset$Memory)
 # dataset$Memory # lots of information 
 unique(dataset$Memory) # what are the unique one - 39 chan
 table(dataset$Memory) # value count
@@ -249,20 +254,52 @@ table(dataset$Memory) # value count
 # some with both ssd and hdd, some have only ssd, some have hybrid, flash storage.
 # so, we separate the value in 4 column - 1. Hard drive 2. SSD 3. Flash Storage, 4. Hybrid
 
-# glimpse(dataset)
+dataset$Memory <- gsub("\\.0", "", as.character(dataset$Memory))
+dataset$Memory <- gsub("GB", "", dataset$Memory)
+dataset$Memory <- gsub("TB", "000", dataset$Memory)
+new <- strsplit(dataset$Memory, "\\+", fixed = TRUE)
+table(unlist(new))
 
-# dataset$Memory <- gsub("\\.0", "", as.character(dataset$Memory))
-# #Replacing GB to ''(null or empty)
-# dataset$Memory <- gsub("GB", "", dataset$Memory)
-# #Replacing TB to 000 (1TB = 1000GB)
-# dataset$Memory <- gsub("TB", "000", dataset$Memory)
-# split 64GB Flash Storage +  1TB(000) HDD
-# new <- strsplit(dataset$Memory, "\\+")[1][2]
+dataset$first <- sapply(new, function(x) x[1])
+dataset$first <- trimws(dataset$first)
+dataset$second <- sapply(new, function(x) ifelse(length(x) > 1, x[2], NA))
+unique(dataset$first)
+head(dataset)
+
+dataset$Layer1hdd <- ifelse(grepl("HDD", dataset$first), 1, 0)
+dataset$Layer1ssd <- ifelse(grepl("SSD", dataset$first), 1, 0)
+dataset$Layer1Hybrid <- ifelse(grepl("Hybrid", dataset$first), 1, 0)
+dataset$Layer1Flash_Storage <- ifelse(grepl("Flash Storage", dataset$first), 1, 0)
+head(dataset)
+
+dataset$first <- gsub("\\D", "", dataset$first)
+head(df)
+
+dataset$second <- ifelse(is.na(dataset$second), "0", dataset$second)
+
+dataset$Layer2hdd <- ifelse(grepl("HDD", dataset$second), 1, 0)
+dataset$Layer2ssd <- ifelse(grepl("SSD", dataset$second), 1, 0)
+dataset$Layer2Hybrid <- ifelse(grepl("Hybrid", dataset$second), 1, 0)
+dataset$Layer2Flash_Storage <- ifelse(grepl("Flash Storage", dataset$second), 1, 0)
+
+dataset$second <- gsub("\\D", "", dataset$second)
+head(dataset)
 
 
+dataset$first <- as.integer(dataset$first)
+dataset$second <- as.integer(dataset$second)
 
-#----------------------
+dataset$HDD <- (dataset$first * dataset$Layer1hdd) + (dataset$second * dataset$Layer2hdd)
+dataset$SSD <- (dataset$first * dataset$Layer1ssd) + (dataset$second * dataset$Layer2ssd)
+dataset$Hybrid <- (dataset$first * dataset$Layer1Hybrid) + (dataset$second * dataset$Layer2Hybrid)
+dataset$Flash_Storage <- (dataset$first * dataset$Layer1Flash_Storage) + (dataset$second * dataset$Layer2Flash_Storage)
 
+dataset <- dataset[, !(names(dataset) %in% c("first", "second", "Layer1hdd", "Layer1ssd", "Layer2hdd", "Layer2ssd", "Layer1Flash_Storage", "Layer2Flash_Storage", "Layer1Hybrid", "Layer2Hybrid"))]
+dataset <- dataset[, !(names(dataset) == "Memory"), drop = FALSE]
+head(dataset)
+
+
+# GPU Column
 table(dataset$Gpu)
 # Many different graphics card information, but we only select brand name of
 # particular graphics card
@@ -315,3 +352,124 @@ barplot(table(dataset$OS), main='count of Operating System',ylab = "Count",xlab 
 ggplot(dataset, aes(x = factor(OS), y = Price, fill = Price, colour = Price)) + 
   geom_bar(stat = "identity", position = "dodge")
 # windows laptop are more expansive compare to other's
+
+
+# Weight Column
+head(dataset)
+
+# Relationship btn Weight and Price
+ggplot(dataset, aes(x = Weight, y = Price)) +
+  geom_point() +
+  labs(x = "Weight", y = "Price", title = "Weight VS Price") +
+  theme(text = element_text(size = 12))
+# Sightly high Price with more weight laptop but not that much.
+
+
+# Correlation Matrix for our dataset
+
+glimpse(dataset)
+
+# Only numeric column - cor()
+cor(dataset[,unlist(lapply(dataset, is.numeric))])
+
+
+# ---------- Target Column -> Price --------------------
+
+library(psych)
+describe(dataset)
+
+hist(dataset$Price,
+     main = "Price Graph")
+
+# As we can see, our target variable Price is right-skewed. 
+# By transforming it to normal distribution performance of the algorithm will increase.
+# So, we use log to transfer it.
+glimpse(dataset)
+
+# dataset$Price_log <- log(dataset$Price) - Comment for data separate X and Y
+
+# hist(dataset$Price_log,
+#      main = "Price Graph") # Price data right-skewed solve
+
+# Drop Price Column
+# As, dependent and independent variables we will take a log of price.
+
+X <- dataset[, !(names(dataset) %in% c('Price'))] # Without Price Column
+Y <- log(dataset$Price) # Y as Price log value 
+
+head(X) # Except Price column
+head(Y) # Price 
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+
+
+# Split Data for Training and Testing
+# Splitting the dataset
+
+
+
+# Install Required Package - Model Testing
+
+# Installing the package 
+
+library("dplyr")                                # Load dplyr for data manipulation
+library(caTools) # For Logistic regression 
+
+ 
+library(randomForest)# For generating random forest model
+
+library(mlr) # For Machine Learning pipeline
+
+library(reshape2)
+
+
+library(caret)# classification and regression training 
+
+
+set.seed(2)
+trainIndex <- createDataPartition(Y, p = 0.85, list = FALSE)
+X_train <- X[trainIndex, ]
+X_test <- X[-trainIndex, ]
+Y_train <- Y[trainIndex]
+Y_test <- Y[-trainIndex]
+
+
+dim(X_train)
+head(X_train)
+dim(X_train)
+head(X_train)
+dim(X_train)
+head(X_train)
+
+
+
+
+
+
+# SplitRatio <- 0.8 # 80% training 20% testing
+# split <- sample.split(X, SplitRatio)
+# split
+# 
+# data_train <- subset(X, split=="True")
+# # Train data - Get all data point which is "TRUE"
+# data_test <- subset(X, split == "False")
+# # Test data - get all data point which is "FALSE"
+# 
+# dim(data_train) # shape train data
+# head(data_train)
+# 
+# dim(data_test) # shape test data
+# head(data_test)
+# 
+# 
+# # convert target variable to factor form
+# # Our target variable is Price and rest are numeric and some char.
+# 
+# dataset$Y <- as.factor(dataset$Y)
+# 
+# 
+# 
+# 
