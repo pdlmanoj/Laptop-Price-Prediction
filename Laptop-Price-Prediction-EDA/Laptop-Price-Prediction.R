@@ -6,6 +6,18 @@ library(GGally)
 library(ggplot2)
 library(randomForest)
 library(caret)
+library(dplyr)
+library(corrplot)
+library(caTools)
+library(caret)
+library(e1071)
+library(rpart)
+library(randomForest)
+library(MASS)
+library(xgboost)
+install.packages("car")
+library(car)
+
 
 # load laptop-prediction dataset
 
@@ -294,7 +306,14 @@ dataset$SSD <- (dataset$first * dataset$Layer1ssd) + (dataset$second * dataset$L
 dataset$Hybrid <- (dataset$first * dataset$Layer1Hybrid) + (dataset$second * dataset$Layer2Hybrid)
 dataset$Flash_Storage <- (dataset$first * dataset$Layer1Flash_Storage) + (dataset$second * dataset$Layer2Flash_Storage)
 
+
+
 dataset <- dataset[, !(names(dataset) %in% c("first", "second", "Layer1hdd", "Layer1ssd", "Layer2hdd", "Layer2ssd", "Layer1Flash_Storage", "Layer2Flash_Storage", "Layer1Hybrid", "Layer2Hybrid"))]
+
+cor(dataset[,unlist(lapply(dataset, is.numeric))])
+# If we see correlation of Price with Hybrid and Flash_Stroage doesn't have less correlation.
+# So, we drop this two column
+dataset <- dataset[, !(names(dataset) %in% c("Hybrid", "Flash_Storage"))]
 dataset <- dataset[, !(names(dataset) == "Memory"), drop = FALSE]
 head(dataset)
 
@@ -364,112 +383,156 @@ ggplot(dataset, aes(x = Weight, y = Price)) +
   theme(text = element_text(size = 12))
 # Sightly high Price with more weight laptop but not that much.
 
+# Company vs Price box plot
+ggplot(data= dataset, aes(x= Company, y= Price, fill= Company))+
+  geom_boxplot()+
+  ggtitle("Company VS Price")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-# Correlation Matrix for our dataset
 
+# ========================================
+# Correlation Matrix for our data set
+# ========================================
 glimpse(dataset)
 
 # Only numeric column - cor()
 cor(dataset[,unlist(lapply(dataset, is.numeric))])
 
-
-# ---------- Target Column -> Price --------------------
-
-library(psych)
-describe(dataset)
-
-hist(dataset$Price,
-     main = "Price Graph")
-
-# As we can see, our target variable Price is right-skewed. 
-# By transforming it to normal distribution performance of the algorithm will increase.
-# So, we use log to transfer it.
-glimpse(dataset)
-
-# dataset$Price_log <- log(dataset$Price) - Comment for data separate X and Y
-
-# hist(dataset$Price_log,
-#      main = "Price Graph") # Price data right-skewed solve
-
-# Drop Price Column
-# As, dependent and independent variables we will take a log of price.
-
-X <- dataset[, !(names(dataset) %in% c('Price'))] # Without Price Column
-Y <- log(dataset$Price) # Y as Price log value 
-
-head(X) # Except Price column
-head(Y) # Price 
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-
-
-# Split Data for Training and Testing
-# Splitting the dataset
+# ploting correlation Graph
+numericData <- dataset[,sapply(dataset, is.numeric)] #filter all numeric vars
+numericData <- numericData[, -c(1, 15)] #drop the id column and dependent var
+corMat <- cor(numericData) #correlation matrix
+corrplot(corMat, method = "number", type = "lower")
+# Which one is high correlated.
+highlyCorrelated <- findCorrelation(corMat, cutoff = 0.7) #find highly correlated
+highlyCorCol <- colnames(numericData)[highlyCorrelated]
+highlyCorCol # SSD is as we can see.
 
 
 
-# Install Required Package - Model Testing
+# What's About our Price Density
 
-# Installing the package 
+ggplot(dataset, aes(x = Price)) +
+  geom_density(aes(fill = "Density"), alpha = 0.5) +
+  geom_bar(aes(y = ..density.., fill = "Count"), alpha = 0.5, stat = "density") +
+  scale_fill_manual(values = c("Density" = "blue", "Count" = "red")) +
+  labs(title = "Price Distribution", x = "Price", y = "Count") +
+  theme_minimal()
+# As we can see, our targeted column Price is right skewed 
+# By transforming it to normal distribution performance of the algorithm 
+# will increase. we take the log of values
 
-library("dplyr")                                # Load dplyr for data manipulation
-library(caTools) # For Logistic regression 
+ggplot(dataset, aes(x = log(Price))) +
+  geom_freqpoly(binwidth = 0.2, size = .8, color = "red") +
+  geom_histogram(binwidth = 0.2, fill = "blue", color = "black") +
+  xlab("Log(Price)") +
+  ylab("Frequency / Count") +
+  ggtitle("Distribution of Logarithm of Price")
 
- 
-library(randomForest)# For generating random forest model
-
-library(mlr) # For Machine Learning pipeline
-
-library(reshape2)
-
-
-library(caret)# classification and regression training 
-
-
-set.seed(2)
-trainIndex <- createDataPartition(Y, p = 0.85, list = FALSE)
-X_train <- X[trainIndex, ]
-X_test <- X[-trainIndex, ]
-Y_train <- Y[trainIndex]
-Y_test <- Y[-trainIndex]
+dataset$Price = log(dataset$Price) # log value Price to Price column
+head(dataset$Price)
 
 
-dim(X_train)
-head(X_train)
-dim(X_train)
-head(X_train)
-dim(X_train)
-head(X_train)
+head(dataset) # As we can see there are many categorial data like
+# company, typeName, Gpubrand, Os
+
+# Specify the categorical columns
+categorial_columns <- c("Company", "TypeName", "OS", "Cpu_brand", "Gpubrand")
+
+categorial_columns
+
+# Encode categorical variables as integers using label encoding
+
+for (col in categorial_columns) {
+  dataset[[col]] <- as.integer(factor(dataset[[col]]))
+}
+
+head(dataset) # sucessfully change categorial to numeric
+
+cor_matrix <- cor(dataset)
+# Create a heatmap of the correlation matrix
+corrplot(cor_matrix, method = "color", type = "full", tl.cex = 0.8)
 
 
+vif_values <- vif(lm(Price ~ ., data = dataset))
+
+# Print the VIF values
+print(vif_values)
+
+##### Removing outliers using robust regression
+library(MASS)
+model = rlm(Price ~ ., data = dataset)
+residuals = residuals(model)
 
 
+mad = median(abs(residuals - median(residuals)))
+threshold = 3 * mad
+outliers = which(abs(residuals) > threshold)
 
 
-# SplitRatio <- 0.8 # 80% training 20% testing
-# split <- sample.split(X, SplitRatio)
-# split
-# 
-# data_train <- subset(X, split=="True")
-# # Train data - Get all data point which is "TRUE"
-# data_test <- subset(X, split == "False")
-# # Test data - get all data point which is "FALSE"
-# 
-# dim(data_train) # shape train data
-# head(data_train)
-# 
-# dim(data_test) # shape test data
-# head(data_test)
-# 
-# 
-# # convert target variable to factor form
-# # Our target variable is Price and rest are numeric and some char.
-# 
-# dataset$Y <- as.factor(dataset$Y)
-# 
-# 
-# 
-# 
+data_no_outliers = dataset %>%
+  filter(!row_number() %in% outliers)
+
+# ----------------------------
+# ----------------------------
+# TRAINING AND TESTING DATA
+# ----------------------------
+# ----------------------------
+
+set.seed(123)
+split = sample.split(data_no_outliers$Price, SplitRatio = .80)
+
+training_set = subset(data_no_outliers, split== TRUE)
+test_set = subset(data_no_outliers, split == FALSE)
+y_test = test_set$Price
+
+# --------------------------
+### LINEAR REGRESSION
+# ------------------------------
+
+reg_1 = lm(formula = Price~.-Weight -TypeName,
+           data = training_set)
+
+summary(reg_1)
+
+#printing adjusted R-squared
+
+summary(reg_1)$adj.r.squared
+
+
+y_pred = predict(reg_1, newdata= test_set)
+
+y_pred
+
+y_pred <- predict(model, newdata=test_set)
+
+comparison <- data.frame(predicted=exp(y_pred), True=exp(y_test))
+comparison
+# --------------------------
+### RANDOM FOREST
+# ---------------------------
+
+set.seed(1234)
+reg_4 = randomForest(
+  x= training_set[-7],
+  y= training_set$Price,
+  ntree= 200,
+  mtry = 4,
+  
+)
+
+#prediction
+y_pred = predict(reg_4, newdata = test_set)
+
+#calculate R2 score
+r2_score = R2(y_pred, y_test)
+
+#calculate MAE score
+mae = MAE(y_pred, y_test)
+
+#print R2 and mae score
+print(paste("R2 score:", r2_score))
+print(paste("MAE Score:", mae))
+
+comparison = data.frame(predicted= exp(y_pred), True= exp(y_test))
+print(comparison)
