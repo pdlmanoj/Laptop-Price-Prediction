@@ -484,6 +484,7 @@ head(training_set)
 head(test_set)
 head(y_test) # target value - log(Price)
 
+
 #######################################
 # 1. Linear Regression
 
@@ -605,7 +606,7 @@ print(paste("R2 score:", r2_score)) # 0.988 = 98% accuracy
 print(paste("MAE Score:", mae))
 
 # Comparing Traning Price Prediction with Real Price
-comparison = data.frame(predicted= exp(y_pred), True= exp(y_test))
+comparison = data.frame(predicted <- exp(y_pred), True= exp(y_test))
 print(comparison)
 
 #####################
