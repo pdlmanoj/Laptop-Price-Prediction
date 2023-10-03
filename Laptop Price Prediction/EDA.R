@@ -65,6 +65,13 @@ glimpse(dataset)
 ## Data visualization / EDA
 # =============================
 
+## The price in this dataset is in INR.
+## Lets change the price into NPR by applying the exchange rate 1INR = 1.6 NPR
+
+dataset$Price <- dataset$Price * 1.6
+
+
+
 # Which price laptop were more sold?
 hist(dataset$Price, main='Distribution of Price', xlab='Price', col='blue', breaks=12)
 
@@ -72,7 +79,7 @@ hist(dataset$Price, main='Distribution of Price', xlab='Price', col='blue', brea
 ggplot(data = dataset) +
   geom_bar(mapping = aes(x = Company))
 
-# company relationship with price 
+# company relationship with price
 # which company laptop have high price?
 ggplot(dataset, aes(x = factor(Company), y = Price, fill = Price, colour = Price)) + 
   geom_bar(stat = "identity", position = "dodge")
