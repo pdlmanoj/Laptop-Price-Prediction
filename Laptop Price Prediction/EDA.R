@@ -395,12 +395,13 @@ head(dataset)
 
 glimpse(dataset)
 
+head(dataset)
 # Only numeric column - cor()
 cor(dataset[,unlist(lapply(dataset, is.numeric))])
 
 # ploting correlation Graph
 numericData <- dataset[,sapply(dataset, is.numeric)] #filter all numeric vars
-numericData <- numericData[, -c(1, 15)] #drop the id column and dependent var
+numericData <- numericData[, -c(0, 15)] #drop the id column and dependent var
 corMat <- cor(numericData) #correlation matrix
 corrplot(corMat, method = "number", type = "lower")
 # Which one is high correlated.
@@ -410,6 +411,11 @@ highlyCorCol # SSD is highly correlated with price, and HDD have -ve cor relatio
 # which means, high HDD tends to low price of laptop.
 
 head(dataset)
+
+###### HEAP MAP #######
+
+# Create a heatmap of the correlation matrix
+corrplot(corMat, method = "color", type = "full", tl.cex = 0.8)
 
 
 # What's About our Price Density
