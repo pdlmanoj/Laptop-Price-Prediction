@@ -415,8 +415,8 @@ head(dataset)
 ###### HEAP MAP #######
 
 # Create a heatmap of the correlation matrix
-corrplot(corMat, method = "color", type = "full", tl.cex = 0.8)
 
+corrplot(corMat, method = "color", type = "full", tl.cex = 0.8, addCoef.col = "black")
 
 # What's About our Price Density
 
