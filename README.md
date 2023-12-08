@@ -1,5 +1,5 @@
 
-# Laptop Price Prediction using Statistical Techniques
+# Laptop Price Prediction using R
 
 ## Overview
 
